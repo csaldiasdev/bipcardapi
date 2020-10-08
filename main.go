@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -98,12 +99,46 @@ func handleBipCardMovements(w http.ResponseWriter, r *http.Request) {
 
 	body, err = getBytesPostRequest(comercialesPortalServletURL, bodyMovementsRequest)
 
+	re2, err := regexp.Compile(`<tr id="fila_[\s\S]*?<\/tr>`)
+	resultDetails := re2.FindAllStringSubmatch(string(body), -1)
+
+	if len(resultDetails) == 0 {
+		http.Error(w, "scrapping error: unexpected changes in webpage ", http.StatusInternalServerError)
+		return
+	}
+
+	var dataResponse []cardMovement
+
+	for _, val := range resultDetails {
+
+		reDetail, _ := regexp.Compile(`<td[\s\S]*?>(.*)<\/td>`)
+		reResult := reDetail.FindAllStringSubmatch(val[0], -1)
+
+		movement := cardMovement{
+			MovementID:   strings.Replace(reResult[1][1], "&nbsp;", "", -1),
+			TypeMovement: strings.Replace(reResult[2][1], "&nbsp;", "", -1),
+			DateTime:     strings.Replace(reResult[3][1], "&nbsp;", "", -1),
+			Place:        strings.Replace(reResult[4][1], "&nbsp;", "", -1),
+			Amount:       strings.Replace(reResult[5][1], "&nbsp;", "", -1),
+			Balance:      strings.Replace(reResult[6][1], "&nbsp;", "", -1),
+		}
+
+		dataResponse = append(dataResponse, movement)
+	}
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Println(string(body))
+	js, err := json.Marshal(dataResponse)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(js)
 }
 
 type cardInfo struct {
@@ -114,7 +149,7 @@ type cardInfo struct {
 }
 
 type cardMovement struct {
-	MovementID   string `json:"movementID"`
+	MovementID   string `json:"movementId"`
 	TypeMovement string `json:"typeMovement"`
 	DateTime     string `json:"dateTime"`
 	Place        string `json:"place"`
