@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -46,11 +48,21 @@ func handleBipCardBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	strContractStatus := strings.TrimSpace(html.UnescapeString(result[3][1]))
+
+	strCardBalance := strings.TrimSpace(html.UnescapeString(result[5][1]))
+	strCardBalance = strings.Replace(strCardBalance, "$", "", -1)
+	strCardBalance = strings.Replace(strCardBalance, ".", "", -1)
+	intCardBalance, _ := strconv.Atoi(strCardBalance)
+
+	strCardBalanceDate := strings.TrimSpace(html.UnescapeString(result[7][1]))
+	dtCardBalanceDate, _ := time.Parse("02/01/2006 15:04", strCardBalanceDate)
+
 	cardInfo := cardInfo{
 		CardNumber:      result[1][1],
-		ContractStatus:  result[3][1],
-		CardBalance:     result[5][1],
-		CardBalanceDate: result[7][1],
+		ContractStatus:  strContractStatus,
+		CardBalance:     intCardBalance,
+		CardBalanceDate: dtCardBalanceDate,
 	}
 
 	js, err := json.Marshal(cardInfo)
@@ -114,13 +126,31 @@ func handleBipCardMovements(w http.ResponseWriter, r *http.Request) {
 		reDetail, _ := regexp.Compile(`<td[\s\S]*?>(.*)<\/td>`)
 		reResult := reDetail.FindAllStringSubmatch(val[0], -1)
 
+		strMovementID := strings.TrimSpace(html.UnescapeString(reResult[1][1]))
+		intMovementID, _ := strconv.Atoi(strMovementID)
+
+		strTypeMovement := strings.TrimSpace(html.UnescapeString(reResult[2][1]))
+
+		strDateTime := strings.TrimSpace(html.UnescapeString(reResult[3][1]))
+		dtDateTime, _ := time.Parse("02/01/2006 15:04", strDateTime)
+
+		strPlace := strings.TrimSpace(html.UnescapeString(reResult[4][1]))
+
+		strAmount := strings.Replace(strings.TrimSpace(html.UnescapeString(reResult[5][1])), ".", "", -1)
+
+		intAmount, _ := strconv.Atoi(strAmount)
+
+		strBalance := strings.Replace(strings.TrimSpace(html.UnescapeString(reResult[6][1])), ".", "", -1)
+
+		intBalance, _ := strconv.Atoi(strBalance)
+
 		movement := cardMovement{
-			MovementID:   strings.Replace(reResult[1][1], "&nbsp;", "", -1),
-			TypeMovement: strings.Replace(reResult[2][1], "&nbsp;", "", -1),
-			DateTime:     strings.Replace(reResult[3][1], "&nbsp;", "", -1),
-			Place:        strings.Replace(reResult[4][1], "&nbsp;", "", -1),
-			Amount:       strings.Replace(reResult[5][1], "&nbsp;", "", -1),
-			Balance:      strings.Replace(reResult[6][1], "&nbsp;", "", -1),
+			MovementID:   intMovementID,
+			TypeMovement: strTypeMovement,
+			DateTime:     dtDateTime,
+			Place:        strPlace,
+			Amount:       intAmount,
+			Balance:      intBalance,
 		}
 
 		dataResponse = append(dataResponse, movement)
@@ -142,19 +172,19 @@ func handleBipCardMovements(w http.ResponseWriter, r *http.Request) {
 }
 
 type cardInfo struct {
-	CardNumber      string `json:"cardNumber"`
-	ContractStatus  string `json:"contractStatus"`
-	CardBalance     string `json:"cardBalance"`
-	CardBalanceDate string `json:"cardBalanceDate"`
+	CardNumber      string    `json:"cardNumber"`
+	ContractStatus  string    `json:"contractStatus"`
+	CardBalance     int       `json:"cardBalance"`
+	CardBalanceDate time.Time `json:"cardBalanceDate"`
 }
 
 type cardMovement struct {
-	MovementID   string `json:"movementId"`
-	TypeMovement string `json:"typeMovement"`
-	DateTime     string `json:"dateTime"`
-	Place        string `json:"place"`
-	Amount       string `json:"amount"`
-	Balance      string `json:"balance"`
+	MovementID   int       `json:"movementId"`
+	TypeMovement string    `json:"typeMovement"`
+	DateTime     time.Time `json:"dateTime"`
+	Place        string    `json:"place"`
+	Amount       int       `json:"amount"`
+	Balance      int       `json:"balance"`
 }
 
 func getBytesPostRequest(url string, formBody string) ([]byte, error) {
