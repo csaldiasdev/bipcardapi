@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -165,10 +165,6 @@ func (client *BipCardClient) GetBipCardMovements(cardNumber string) ([]CardMovem
 		})
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	return movements, nil
 }
 
@@ -185,5 +181,5 @@ func getBytesPostRequest(url string, formBody string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
