@@ -4,8 +4,6 @@ import (
 	"bipcardapi/internal/bipcard"
 	"encoding/json"
 	"net/http"
-
-	"github.com/gorilla/mux"
 )
 
 const cardNumberKeyParam = "CARD_NUMBER"
@@ -22,19 +20,20 @@ func newServer() server {
 
 func NewHTTPServer(addr string) *http.Server {
 	srv := newServer()
-	r := mux.NewRouter()
 
-	r.HandleFunc("/api/v1/bipcard/{"+cardNumberKeyParam+"}/info", srv.handleCardInfo).Methods(http.MethodGet)
-	r.HandleFunc("/api/v1/bipcard/{"+cardNumberKeyParam+"}/movements", srv.handleCardMovements).Methods(http.MethodGet)
+	stdMux := http.NewServeMux()
+
+	stdMux.HandleFunc("GET /api/v1/bipcard/{"+cardNumberKeyParam+"}/info", srv.handleCardInfo)
+	stdMux.HandleFunc("GET /api/v1/bipcard/{"+cardNumberKeyParam+"}/movements", srv.handleCardMovements)
 
 	return &http.Server{
 		Addr:    addr,
-		Handler: r,
+		Handler: stdMux,
 	}
 }
 
 func (s server) handleCardInfo(w http.ResponseWriter, r *http.Request) {
-	cNumber := getPathParam(r, cardNumberKeyParam)
+	cNumber := r.PathValue(cardNumberKeyParam)
 
 	data, err := s.bipCardClient.GetBipCardInfo(cNumber)
 
@@ -47,7 +46,7 @@ func (s server) handleCardInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s server) handleCardMovements(w http.ResponseWriter, r *http.Request) {
-	cNumber := getPathParam(r, cardNumberKeyParam)
+	cNumber := r.PathValue(cardNumberKeyParam)
 
 	data, err := s.bipCardClient.GetBipCardMovements(cNumber)
 
@@ -57,9 +56,4 @@ func (s server) handleCardMovements(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(data)
-}
-
-func getPathParam(r *http.Request, key string) string {
-	vars := mux.Vars(r)
-	return vars[key]
 }
